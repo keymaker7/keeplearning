@@ -77,6 +77,45 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUserPassword(id: string, password: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ password })
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+
+  async createBulkStudents(studentsData: Array<{ name: string; studentNumber: string; username: string; password: string }>): Promise<User[]> {
+    const results = [];
+    
+    for (const studentData of studentsData) {
+      try {
+        // Create user account
+        const user = await this.createUser({
+          username: studentData.username,
+          password: studentData.password,
+          role: "student",
+        });
+
+        // Create student profile
+        await this.createStudent({
+          name: studentData.name,
+          studentNumber: studentData.studentNumber,
+          classRoom: "5학년 7반",
+          userId: user.id,
+        });
+
+        results.push(user);
+      } catch (error) {
+        console.error(`Failed to create student ${studentData.name}:`, error);
+        // Continue with other students
+      }
+    }
+
+    return results;
+  }
+
   // Student methods
   async getAllStudents(): Promise<Student[]> {
     return await db.select().from(students).where(eq(students.isActive, true)).orderBy(asc(students.studentNumber));
