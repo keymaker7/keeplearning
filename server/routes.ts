@@ -227,6 +227,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get timetable information for a specific week
+  app.get("/api/weekly-materials/timetable/:week", requireAuth, async (req, res) => {
+    try {
+      const { week } = req.params;
+      let material = await storage.getWeeklyMaterialByWeek(parseInt(week));
+      
+      // 시간표 데이터가 없으면 샘플 시간표 데이터 생성 (테스트용)
+      if (!material || !material.timetable) {
+        const sampleTimetable = {
+          "월": {
+            "1": { subject: "국어", unit: "문학", topic: "작품을 읽고 느낌 나타내기" },
+            "2": { subject: "수학", unit: "분수", topic: "분수의 덧셈과 뺄셈" },
+            "3": { subject: "과학", unit: "생태계", topic: "생태계 구성 요소 알아보기" },
+            "4": { subject: "사회", unit: "삼국통일", topic: "신라의 삼국통일 과정" },
+            "5": { subject: "체육", unit: "체력운동", topic: "기초체력 기르기" },
+            "6": { subject: "음악", unit: "노래부르기", topic: "계이름으로 부르기" }
+          },
+          "화": {
+            "1": { subject: "수학", unit: "분수", topic: "분수의 크기 비교하기" },
+            "2": { subject: "국어", unit: "대화", topic: "상황에 맞는 대화하기" },
+            "3": { subject: "영어", unit: "My School", topic: "학교 장소 이름 익히기" },
+            "4": { subject: "미술", unit: "표현", topic: "상상화 그리기" },
+            "5": { subject: "과학", unit: "생태계", topic: "먹이 관계 알아보기" },
+            "6": { subject: "도덕", unit: "정직", topic: "정직한 생활 실천하기" }
+          },
+          "수": {
+            "1": { subject: "사회", unit: "삼국과 가야", topic: "고구려, 백제, 신라의 문화" },
+            "2": { subject: "수학", unit: "분수", topic: "분수의 곱셈" },
+            "3": { subject: "국어", unit: "토의하기", topic: "의견을 나누며 토의하기" },
+            "4": { subject: "실과", unit: "간단한 음식", topic: "샐러드 만들기" },
+            "5": { subject: "체육", unit: "경쟁활동", topic: "피구게임하기" },
+            "6": { subject: "창체", unit: "동아리", topic: "독서 동아리 활동" }
+          },
+          "목": {
+            "1": { subject: "국어", unit: "글쓰기", topic: "경험을 글로 써보기" },
+            "2": { subject: "과학", unit: "생태계", topic: "생태계 보전 방법" },
+            "3": { subject: "수학", unit: "분수", topic: "분수의 나눗셈" },
+            "4": { subject: "영어", unit: "My School", topic: "학교생활 표현하기" },
+            "5": { subject: "사회", unit: "문화재", topic: "우리나라 문화재 알아보기" },
+            "6": { subject: "음악", unit: "감상", topic: "클래식 음악 감상하기" }
+          },
+          "금": {
+            "1": { subject: "수학", unit: "소수", topic: "소수의 의미 알기" },
+            "2": { subject: "국어", unit: "읽기", topic: "글의 중심내용 파악하기" },
+            "3": { subject: "과학", unit: "물질의 성질", topic: "물질의 특성 관찰하기" },
+            "4": { subject: "미술", unit: "만들기", topic: "찰흙으로 작품 만들기" },
+            "5": { subject: "도덕", unit: "배려", topic: "다른 사람을 배려하는 마음" },
+            "6": { subject: "창체", unit: "자율", topic: "학급회의 하기" }
+          },
+          "토": {
+            "1": { subject: "국어", unit: "독서", topic: "다양한 책 읽기" },
+            "2": { subject: "수학", unit: "소수", topic: "소수의 덧셈과 뺄셈" },
+            "3": { subject: "실과", unit: "생활용품", topic: "생활용품 만들기" },
+            "4": { subject: "체육", unit: "표현활동", topic: "리듬체조 배우기" }
+          }
+        };
+
+        // Return sample timetable data
+        res.json({
+          week: parseInt(week),
+          timetable: sampleTimetable
+        });
+        return;
+      }
+
+      // Return existing timetable information
+      res.json({
+        week: material.week,
+        timetable: material.timetable || {}
+      });
+    } catch (error) {
+      res.status(500).json({ message: "시간표 정보 조회 실패" });
+    }
+  });
+
   // Learning records routes
   app.get("/api/learning-records", requireAuth, async (req, res) => {
     try {
@@ -361,7 +436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 학생 정보와 함께 조회
       const recordsWithStudents = await Promise.all(
         records.map(async (record) => {
-          const student = await storage.getStudent(record.studentId);
+          const student = record.studentId ? await storage.getStudent(record.studentId) : null;
           return {
             ...record,
             student: student ? {

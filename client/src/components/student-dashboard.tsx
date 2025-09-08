@@ -20,6 +20,7 @@ export default function StudentDashboard() {
   const [viewMode, setViewMode] = useState("weekly"); // "weekly" or "daily"
   const [selectedDay, setSelectedDay] = useState("월");
   const [learningRecords, setLearningRecords] = useState<Record<string, { content: string; reflection: string; unit?: string; activity?: string }>>({});
+  const [dailyRecords, setDailyRecords] = useState<Record<string, Record<number, { subject: string; unit: string; content: string; reflection: string }>>>({});
 
   // Fetch data
   const { data: weeklyMaterials = [] } = useQuery({
@@ -41,6 +42,12 @@ export default function StudentDashboard() {
       return fetch(`/api/learning-records/weekly?${params}`)
         .then(res => res.json());
     },
+  });
+
+  // 시간표 정보 조회
+  const { data: timetableInfo } = useQuery<any>({
+    queryKey: ["/api/weekly-materials/timetable", selectedWeek],
+    enabled: viewMode === "daily" && !!selectedWeek,
   });
 
   // Mutations
@@ -91,6 +98,31 @@ export default function StudentDashboard() {
     return colors[subject] || "bg-gray-50 border-gray-200 text-gray-800";
   };
 
+  // 시간표에서 특정 요일/교시의 정보를 가져오는 함수
+  const getTimetableInfo = (dayOfWeek: string, period: number) => {
+    if (!timetableInfo?.timetable) return { subject: "", unit: "" };
+    return timetableInfo.timetable[dayOfWeek]?.[period] || { subject: "", unit: "" };
+  };
+
+  // 일별 기록 업데이트 함수
+  const updateDailyRecord = (dayOfWeek: string, period: number, field: string, value: string) => {
+    setDailyRecords(prev => ({
+      ...prev,
+      [dayOfWeek]: {
+        ...prev[dayOfWeek],
+        [period]: {
+          ...prev[dayOfWeek]?.[period],
+          [field]: value
+        }
+      }
+    }));
+  };
+
+  // 일별 기록 가져오기 함수
+  const getDailyRecord = (dayOfWeek: string, period: number, field: keyof { subject: string; unit: string; content: string; reflection: string }) => {
+    return dailyRecords[dayOfWeek]?.[period]?.[field] || "";
+  };
+
   const handleRecordChange = (subject: string, field: "content" | "reflection", value: string) => {
     setLearningRecords(prev => ({
       ...prev,
@@ -99,6 +131,32 @@ export default function StudentDashboard() {
         [field]: value
       }
     }));
+  };
+
+  // 요일별 기록 저장 함수
+  const handleSaveDailyRecord = (dayOfWeek: string, period: number, isSubmitted = false) => {
+    const record = dailyRecords[dayOfWeek]?.[period];
+    if (!record?.subject || !record?.content) {
+      toast({
+        title: "입력 오류",
+        description: "과목과 배운 내용을 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const recordData = {
+      subject: record.subject,
+      content: record.content,
+      reflection: record.reflection || "",
+      unit: record.unit || "",
+      week: parseInt(selectedWeek),
+      dayOfWeek,
+      period,
+      isSubmitted,
+    };
+
+    saveLearningRecordMutation.mutate(recordData);
   };
 
   const handleSaveRecord = (subject: string, isSubmitted = false, dayOfWeek?: string, period?: number) => {
@@ -331,38 +389,32 @@ export default function StudentDashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>과목</Label>
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="과목 선택" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {subjects.map((subject) => (
-                              <SelectItem key={subject.name} value={subject.name}>
-                                {subject.icon} {subject.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Input
+                          value={getTimetableInfo(selectedDay, period)?.subject || getDailyRecord(selectedDay, period, "subject")}
+                          onChange={(e) => updateDailyRecord(selectedDay, period, "subject", e.target.value)}
+                          placeholder="과목을 입력하세요"
+                          data-testid={`input-subject-${selectedDay}-${period}`}
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label>단원/학습주제</Label>
                         <Input 
-                          placeholder="예: 분수의 덧셈과 뺄셈"
+                          value={getTimetableInfo(selectedDay, period)?.unit || getDailyRecord(selectedDay, period, "unit")}
+                          onChange={(e) => updateDailyRecord(selectedDay, period, "unit", e.target.value)}
+                          placeholder="단원 또는 학습주제를 입력하세요"
+                          data-testid={`input-unit-${selectedDay}-${period}`}
                         />
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>학습 활동</Label>
-                      <Input 
-                        placeholder="예: 분수 연산 문제 풀이, 모둠별 토론"
-                      />
                     </div>
                     <div className="space-y-2">
                       <Label>배운 내용</Label>
                       <Textarea
                         className="resize-none"
-                        rows={2}
-                        placeholder="이 시간에 배운 내용을 간단히 적어주세요..."
+                        rows={3}
+                        value={getDailyRecord(selectedDay, period, "content")}
+                        onChange={(e) => updateDailyRecord(selectedDay, period, "content", e.target.value)}
+                        placeholder="이 시간에 배운 내용을 자세히 적어주세요..."
+                        data-testid={`textarea-content-${selectedDay}-${period}`}
                       />
                     </div>
                     <div className="space-y-2">
@@ -370,15 +422,29 @@ export default function StudentDashboard() {
                       <Textarea
                         className="resize-none"
                         rows={2}
+                        value={getDailyRecord(selectedDay, period, "reflection")}
+                        onChange={(e) => updateDailyRecord(selectedDay, period, "reflection", e.target.value)}
                         placeholder="어려웠던 점이나 재미있었던 점을 적어주세요..."
+                        data-testid={`textarea-reflection-${selectedDay}-${period}`}
                       />
                     </div>
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleSaveDailyRecord(selectedDay, period, false)}
+                        disabled={saveLearningRecordMutation.isPending}
+                        data-testid={`button-save-${selectedDay}-${period}`}
+                      >
                         <Save className="mr-2 h-4 w-4" />
                         저장
                       </Button>
-                      <Button size="sm">
+                      <Button 
+                        size="sm"
+                        onClick={() => handleSaveDailyRecord(selectedDay, period, true)}
+                        disabled={saveLearningRecordMutation.isPending}
+                        data-testid={`button-submit-${selectedDay}-${period}`}
+                      >
                         <Send className="mr-2 h-4 w-4" />
                         제출
                       </Button>

@@ -27,6 +27,7 @@ export interface IStorage {
   // Weekly material methods
   getAllWeeklyMaterials(): Promise<WeeklyMaterial[]>;
   getWeeklyMaterial(id: string): Promise<WeeklyMaterial | undefined>;
+  getWeeklyMaterialByWeek(week: number): Promise<WeeklyMaterial | undefined>;
   createWeeklyMaterial(material: InsertWeeklyMaterial): Promise<WeeklyMaterial>;
   deleteWeeklyMaterial(id: string): Promise<void>;
   
@@ -161,6 +162,11 @@ export class DatabaseStorage implements IStorage {
 
   async getWeeklyMaterial(id: string): Promise<WeeklyMaterial | undefined> {
     const [material] = await db.select().from(weeklyMaterials).where(eq(weeklyMaterials.id, id));
+    return material || undefined;
+  }
+
+  async getWeeklyMaterialByWeek(week: number): Promise<WeeklyMaterial | undefined> {
+    const [material] = await db.select().from(weeklyMaterials).where(eq(weeklyMaterials.week, week));
     return material || undefined;
   }
 

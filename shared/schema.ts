@@ -34,6 +34,7 @@ export const weeklyMaterials = pgTable("weekly_materials", {
   filePath: text("file_path"),
   content: text("content"), // extracted PDF content
   subjects: jsonb("subjects"), // parsed subjects from PDF
+  timetable: jsonb("timetable"), // 시간표 정보: {dayOfWeek: {period: {subject, unit, topic}}}
   uploadedBy: varchar("uploaded_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
