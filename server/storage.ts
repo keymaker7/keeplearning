@@ -37,6 +37,8 @@ export interface IStorage {
   createLearningRecord(record: InsertLearningRecord): Promise<LearningRecord>;
   updateLearningRecord(id: string, record: Partial<InsertLearningRecord>): Promise<LearningRecord | undefined>;
   getLearningRecordsByStudentAndSubject(studentId: string, subject: string): Promise<LearningRecord[]>;
+  getLearningRecordsByWeekAndDay(week: number, dayOfWeek: string): Promise<LearningRecord[]>;
+  getLearningRecordsByStudentWeekAndDay(studentId: string, week: number, dayOfWeek?: string): Promise<LearningRecord[]>;
   
   // Evaluation methods
   getEvaluationsByStudent(studentId: string): Promise<Evaluation[]>;
@@ -212,6 +214,30 @@ export class DatabaseStorage implements IStorage {
         eq(learningRecords.subject, subject)
       ))
       .orderBy(asc(learningRecords.week));
+  }
+
+  async getLearningRecordsByWeekAndDay(week: number, dayOfWeek: string): Promise<LearningRecord[]> {
+    return await db.select().from(learningRecords)
+      .where(and(
+        eq(learningRecords.week, week),
+        eq(learningRecords.dayOfWeek, dayOfWeek)
+      ))
+      .orderBy(asc(learningRecords.period));
+  }
+
+  async getLearningRecordsByStudentWeekAndDay(studentId: string, week: number, dayOfWeek?: string): Promise<LearningRecord[]> {
+    const conditions = [
+      eq(learningRecords.studentId, studentId),
+      eq(learningRecords.week, week)
+    ];
+
+    if (dayOfWeek) {
+      conditions.push(eq(learningRecords.dayOfWeek, dayOfWeek));
+    }
+
+    return await db.select().from(learningRecords)
+      .where(and(...conditions))
+      .orderBy(asc(learningRecords.period));
   }
 
   // Evaluation methods
