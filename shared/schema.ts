@@ -46,6 +46,10 @@ export const learningRecords = pgTable("learning_records", {
   content: text("content").notNull(), // what student learned
   reflection: text("reflection"), // feelings/difficulties
   week: integer("week").notNull(),
+  dayOfWeek: text("day_of_week"), // 월, 화, 수, 목, 금, 토
+  period: integer("period"), // 1교시, 2교시, 3교시, 4교시, 5교시, 6교시
+  unit: text("unit"), // 단원 정보
+  activity: text("activity"), // 학습 활동
   isSubmitted: boolean("is_submitted").default(false),
   submittedAt: timestamp("submitted_at"),
   createdAt: timestamp("created_at").defaultNow(),
