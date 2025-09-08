@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, Upload, Users, FileText, PenTool, Settings, Plus, Download, Eye, Trash2, KeyRound, UserPlus, Edit } from "lucide-react";
+import { Loader2, Upload, Users, FileText, PenTool, Settings, Plus, Download, Eye, Trash2, KeyRound, UserPlus, Edit, Calendar, Clock, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Student } from "@shared/schema";
 
@@ -23,6 +23,19 @@ export default function TeacherDashboard() {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [bulkStudents, setBulkStudents] = useState("");
+  
+  // Daily Summary states
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    const day = today.getDay();
+    // 주말이면 이번 주 월요일로 설정
+    if (day === 0 || day === 6) {
+      const daysToMonday = day === 0 ? -6 : -5;
+      today.setDate(today.getDate() + daysToMonday);
+    }
+    return today.toISOString().split('T')[0];
+  });
+  const [selectedWeek, setSelectedWeek] = useState("1");
 
   // Fetch data
   const { data: students = [] } = useQuery<Student[]>({
@@ -35,6 +48,12 @@ export default function TeacherDashboard() {
 
   const { data: stats } = useQuery<{ totalStudents: number; submittedThisWeek: number; currentWeek: number; evaluationsGenerated: number }>({
     queryKey: ["/api/dashboard/stats"],
+  });
+
+  // Daily Summary API call
+  const { data: dailySummary = [] } = useQuery<any[]>({
+    queryKey: ["/api/learning-records/daily-summary", selectedDate, selectedWeek],
+    enabled: activeTab === "daily-summary",
   });
 
   // Mutations
@@ -220,6 +239,7 @@ export default function TeacherDashboard() {
           <nav className="p-4 space-y-2">
             {[
               { id: "dashboard", icon: "📊", label: "대시보드" },
+              { id: "daily-summary", icon: "📅", label: "일자별 종합" },
               { id: "students", icon: "👥", label: "학생 관리" },
               { id: "materials", icon: "📄", label: "주간학습 자료" },
               { id: "evaluations", icon: "✏️", label: "평어 관리" },
@@ -353,6 +373,242 @@ export default function TeacherDashboard() {
                   </CardContent>
                 </Card>
               </div>
+            </div>
+          )}
+
+          {/* Daily Summary */}
+          {activeTab === "daily-summary" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold mb-2">일자별 학습 현황</h2>
+                <p className="text-muted-foreground">모든 학생들의 일자별 학습 기록 현황을 종합적으로 확인</p>
+              </div>
+
+              {/* Date Selection */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="h-5 w-5 text-muted-foreground" />
+                      <h3 className="text-lg font-semibold">조회 조건</h3>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className="space-y-2">
+                        <Label>주차</Label>
+                        <Select value={selectedWeek} onValueChange={setSelectedWeek}>
+                          <SelectTrigger className="w-48" data-testid="select-week-summary">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">1주차 (9월 1일 - 9월 7일)</SelectItem>
+                            <SelectItem value="2">2주차 (9월 8일 - 9월 14일)</SelectItem>
+                            <SelectItem value="3">3주차 (9월 15일 - 9월 21일)</SelectItem>
+                            <SelectItem value="4">4주차 (9월 22일 - 9월 28일)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>조회 날짜</Label>
+                        <Input 
+                          type="date" 
+                          value={selectedDate}
+                          onChange={(e) => setSelectedDate(e.target.value)}
+                          data-testid="input-summary-date"
+                          className="w-48"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Summary Statistics */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">전체 교시</p>
+                        <p className="text-2xl font-bold">6교시</p>
+                      </div>
+                      <Clock className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">제출 완료</p>
+                        <p className="text-2xl font-bold text-green-600">{dailySummary.filter(record => record.isSubmitted).length}</p>
+                      </div>
+                      <CheckCircle className="h-8 w-8 text-green-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">임시 저장</p>
+                        <p className="text-2xl font-bold text-yellow-600">{dailySummary.filter(record => !record.isSubmitted && record.content).length}</p>
+                      </div>
+                      <FileText className="h-8 w-8 text-yellow-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">미제출</p>
+                        <p className="text-2xl font-bold text-red-600">{students.length * 6 - dailySummary.length}</p>
+                      </div>
+                      <XCircle className="h-8 w-8 text-red-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Daily Timetable Overview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>시간표별 현황</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-3 font-medium">학생</th>
+                          <th className="text-center p-3 font-medium">1교시</th>
+                          <th className="text-center p-3 font-medium">2교시</th>
+                          <th className="text-center p-3 font-medium">3교시</th>
+                          <th className="text-center p-3 font-medium">4교시</th>
+                          <th className="text-center p-3 font-medium">5교시</th>
+                          <th className="text-center p-3 font-medium">6교시</th>
+                          <th className="text-center p-3 font-medium">진도율</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {students.map((student: any) => {
+                          const studentRecords = dailySummary.filter(record => record.studentId === student.id);
+                          const completedPeriods = studentRecords.filter(r => r.isSubmitted).length;
+                          const progressRate = Math.round((completedPeriods / 6) * 100);
+                          
+                          return (
+                            <tr key={student.id} className="border-b hover:bg-accent/50">
+                              <td className="p-3">
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
+                                    {student.name.charAt(0)}
+                                  </div>
+                                  <span className="font-medium">{student.name}</span>
+                                </div>
+                              </td>
+                              {[1, 2, 3, 4, 5, 6].map(period => {
+                                const record = studentRecords.find(r => r.period === period);
+                                let statusColor = "bg-gray-100";
+                                let statusIcon = "⭕";
+                                
+                                if (record) {
+                                  if (record.isSubmitted) {
+                                    statusColor = "bg-green-100 text-green-800";
+                                    statusIcon = "✅";
+                                  } else if (record.content) {
+                                    statusColor = "bg-yellow-100 text-yellow-800";
+                                    statusIcon = "📝";
+                                  }
+                                }
+                                
+                                return (
+                                  <td key={period} className="p-3 text-center">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${statusColor}`}>
+                                      {statusIcon}
+                                    </div>
+                                    {record && (
+                                      <div className="text-xs mt-1 text-muted-foreground">
+                                        {record.subject?.slice(0, 2)}
+                                      </div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td className="p-3 text-center">
+                                <div className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-medium ${
+                                  progressRate >= 80 ? 'bg-green-100 text-green-800' :
+                                  progressRate >= 50 ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {progressRate}%
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Detailed Records */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>세부 학습 기록</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {dailySummary.length > 0 ? (
+                      dailySummary.map((record: any, index: number) => (
+                        <div key={index} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
+                                {students.find((s: any) => s.id === record.studentId)?.name?.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-medium">
+                                  {students.find((s: any) => s.id === record.studentId)?.name} - {record.period}교시
+                                </p>
+                                <p className="text-sm text-muted-foreground">{record.subject}</p>
+                              </div>
+                            </div>
+                            <Badge variant={record.isSubmitted ? "default" : "secondary"}>
+                              {record.isSubmitted ? "제출 완료" : "임시 저장"}
+                            </Badge>
+                          </div>
+                          
+                          {record.content && (
+                            <div className="space-y-2">
+                              <div>
+                                <p className="text-sm font-medium text-muted-foreground mb-1">학습 내용</p>
+                                <p className="text-sm">{record.content}</p>
+                              </div>
+                              {record.reflection && (
+                                <div>
+                                  <p className="text-sm font-medium text-muted-foreground mb-1">느낀 점</p>
+                                  <p className="text-sm">{record.reflection}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground">
+                          선택한 날짜에 해당하는 학습 기록이 없습니다.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
