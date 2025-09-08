@@ -9,22 +9,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, BookOpen, PenTool, Calendar, Save, Send } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, BookOpen, PenTool, Calendar, Save, Send, CalendarDays, Grid3X3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function StudentDashboard() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
-  const [selectedWeek, setSelectedWeek] = useState("4");
-  const [learningRecords, setLearningRecords] = useState<Record<string, { content: string; reflection: string }>>({});
+  const [selectedWeek, setSelectedWeek] = useState("1");
+  const [viewMode, setViewMode] = useState("weekly"); // "weekly" or "daily"
+  const [selectedDay, setSelectedDay] = useState("월");
+  const [learningRecords, setLearningRecords] = useState<Record<string, { content: string; reflection: string; unit?: string; activity?: string }>>({});
 
   // Fetch data
   const { data: weeklyMaterials = [] } = useQuery({
     queryKey: ["/api/weekly-materials"],
   });
 
-  const { data: myRecords = [] } = useQuery({
+  const { data: myRecords = [] } = useQuery<any[]>({
     queryKey: ["/api/learning-records"],
+  });
+
+  // 요일별/주간별 데이터 조회
+  const { data: weeklyRecords = [] } = useQuery({
+    queryKey: ["/api/learning-records/weekly", selectedWeek, viewMode === "daily" ? selectedDay : null],
+    queryFn: () => {
+      const params = new URLSearchParams({ week: selectedWeek });
+      if (viewMode === "daily" && selectedDay) {
+        params.append("dayOfWeek", selectedDay);
+      }
+      return fetch(`/api/learning-records/weekly?${params}`)
+        .then(res => res.json());
+    },
   });
 
   // Mutations
@@ -54,7 +70,16 @@ export default function StudentDashboard() {
     { name: "수학", icon: "🔢", description: "분수의 곱셈" },
     { name: "과학", icon: "🔬", description: "생태계를 이루고 있는 요소" },
     { name: "사회", icon: "🌏", description: "여러 나라의 교류한 삼국과 가야를 알아봅시다" },
+    { name: "도덕", icon: "💝", description: "바른 마음가짐" },
+    { name: "실과", icon: "🔨", description: "실생활과 관련된 기능" },
+    { name: "체육", icon: "⚽", description: "건강한 몸과 마음" },
+    { name: "음악", icon: "🎵", description: "아름다운 소리와 리듬" },
+    { name: "미술", icon: "🎨", description: "창의적 표현" },
+    { name: "영어", icon: "🔤", description: "외국어 소통" },
   ];
+
+  const daysOfWeek = ["월", "화", "수", "목", "금", "토"];
+  const periods = [1, 2, 3, 4, 5, 6];
 
   const getSubjectColor = (subject: string) => {
     const colors: Record<string, string> = {
@@ -76,8 +101,10 @@ export default function StudentDashboard() {
     }));
   };
 
-  const handleSaveRecord = (subject: string, isSubmitted = false) => {
-    const record = learningRecords[subject];
+  const handleSaveRecord = (subject: string, isSubmitted = false, dayOfWeek?: string, period?: number) => {
+    const recordKey = viewMode === "daily" ? `${subject}-${dayOfWeek}-${period}` : subject;
+    const record = learningRecords[recordKey];
+    
     if (!record?.content) {
       toast({
         title: "저장 실패",
@@ -87,14 +114,24 @@ export default function StudentDashboard() {
       return;
     }
 
-    saveLearningRecordMutation.mutate({
+    const recordData: any = {
       subject,
       content: record.content,
       reflection: record.reflection,
       week: parseInt(selectedWeek),
       isSubmitted,
       submittedAt: isSubmitted ? new Date() : null,
-    });
+    };
+
+    // 요일별 보기일 때 추가 정보 포함
+    if (viewMode === "daily" && dayOfWeek && period) {
+      recordData.dayOfWeek = dayOfWeek;
+      recordData.period = period;
+      recordData.unit = record.unit;
+      recordData.activity = record.activity;
+    }
+
+    saveLearningRecordMutation.mutate(recordData);
   };
 
   return (
@@ -137,30 +174,54 @@ export default function StudentDashboard() {
           <p className="text-muted-foreground">이번 주 학습 내용을 과목별로 정리해보세요</p>
         </div>
 
-        {/* Week Selection */}
+        {/* Week Selection & View Mode */}
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
               <div className="flex items-center space-x-2">
                 <Calendar className="h-5 w-5 text-muted-foreground" />
                 <h3 className="text-lg font-semibold">{selectedWeek}주차 학습 기록</h3>
               </div>
-              <Select value={selectedWeek} onValueChange={setSelectedWeek}>
-                <SelectTrigger className="w-48" data-testid="select-week">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="4">4주차 (9월 8일 - 9월 12일)</SelectItem>
-                  <SelectItem value="3">3주차 (9월 1일 - 9월 5일)</SelectItem>
-                  <SelectItem value="2">2주차 (8월 25일 - 8월 29일)</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant={viewMode === "weekly" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setViewMode("weekly")}
+                    data-testid="button-weekly-view"
+                  >
+                    <Grid3X3 className="mr-2 h-4 w-4" />
+                    주단위 보기
+                  </Button>
+                  <Button
+                    variant={viewMode === "daily" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setViewMode("daily")}
+                    data-testid="button-daily-view"
+                  >
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    요일별 보기
+                  </Button>
+                </div>
+                <Select value={selectedWeek} onValueChange={setSelectedWeek}>
+                  <SelectTrigger className="w-48" data-testid="select-week">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1주차 (9월 1일 - 9월 7일)</SelectItem>
+                    <SelectItem value="2">2주차 (9월 8일 - 9월 14일)</SelectItem>
+                    <SelectItem value="3">3주차 (9월 15일 - 9월 21일)</SelectItem>
+                    <SelectItem value="4">4주차 (9월 22일 - 9월 28일)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Learning Record Forms */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 주단위 보기 */}
+        {viewMode === "weekly" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {subjects.map((subject) => {
             const record = learningRecords[subject.name] || { content: "", reflection: "" };
             const isKoreanWithSample = subject.name === "국어" && selectedWeek === "4";
@@ -230,7 +291,104 @@ export default function StudentDashboard() {
               </Card>
             );
           })}
-        </div>
+          </div>
+        )}
+
+        {/* 요일별 보기 */}
+        {viewMode === "daily" && (
+          <div className="space-y-6">
+            {/* 요일 선택 */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2 mb-4">
+                  <CalendarDays className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold">요일별 시간표 - {selectedDay}요일</h3>
+                </div>
+                <div className="flex space-x-2">
+                  {daysOfWeek.map((day) => (
+                    <Button
+                      key={day}
+                      variant={selectedDay === day ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedDay(day)}
+                      data-testid={`button-day-${day}`}
+                    >
+                      {day}요일
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 교시별 학습 기록 */}
+            <div className="grid gap-4">
+              {periods.map((period) => (
+                <Card key={period}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">{period}교시</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>과목</Label>
+                        <Select>
+                          <SelectTrigger>
+                            <SelectValue placeholder="과목 선택" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {subjects.map((subject) => (
+                              <SelectItem key={subject.name} value={subject.name}>
+                                {subject.icon} {subject.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>단원/학습주제</Label>
+                        <Input 
+                          placeholder="예: 분수의 덧셈과 뺄셈"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>학습 활동</Label>
+                      <Input 
+                        placeholder="예: 분수 연산 문제 풀이, 모둠별 토론"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>배운 내용</Label>
+                      <Textarea
+                        className="resize-none"
+                        rows={2}
+                        placeholder="이 시간에 배운 내용을 간단히 적어주세요..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>느낀 점</Label>
+                      <Textarea
+                        className="resize-none"
+                        rows={2}
+                        placeholder="어려웠던 점이나 재미있었던 점을 적어주세요..."
+                      />
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm">
+                        <Save className="mr-2 h-4 w-4" />
+                        저장
+                      </Button>
+                      <Button size="sm">
+                        <Send className="mr-2 h-4 w-4" />
+                        제출
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex justify-center space-x-4">
