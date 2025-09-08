@@ -298,6 +298,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 요일별/주차별 학습 기록 조회 API
+  app.get("/api/learning-records/weekly", requireAuth, async (req, res) => {
+    try {
+      const { week, dayOfWeek, studentId } = req.query;
+      let actualStudentId = studentId as string;
+      
+      // Student users can only see their own records
+      if (req.user!.role === "student") {
+        const student = await storage.getStudentByUserId(req.user!.id);
+        if (!student) {
+          return res.status(404).json({ message: "학생 정보를 찾을 수 없습니다." });
+        }
+        actualStudentId = student.id;
+      }
+
+      if (!week) {
+        return res.status(400).json({ message: "주차 정보가 필요합니다." });
+      }
+
+      let records;
+      if (actualStudentId) {
+        records = await storage.getLearningRecordsByStudentWeekAndDay(
+          actualStudentId, 
+          parseInt(week as string),
+          dayOfWeek as string
+        );
+      } else if (dayOfWeek) {
+        records = await storage.getLearningRecordsByWeekAndDay(
+          parseInt(week as string),
+          dayOfWeek as string
+        );
+      } else {
+        records = await storage.getLearningRecordsByWeek(parseInt(week as string));
+      }
+
+      res.json(records);
+    } catch (error) {
+      res.status(500).json({ message: "주간 학습 기록 조회 실패" });
+    }
+  });
+
+  // 교사용 일자별 학생 기록 종합 조회 API
+  app.get("/api/learning-records/daily-summary", requireTeacher, async (req, res) => {
+    try {
+      const { week, dayOfWeek } = req.query;
+      
+      if (!week) {
+        return res.status(400).json({ message: "주차 정보가 필요합니다." });
+      }
+
+      let records;
+      if (dayOfWeek) {
+        records = await storage.getLearningRecordsByWeekAndDay(
+          parseInt(week as string),
+          dayOfWeek as string
+        );
+      } else {
+        records = await storage.getLearningRecordsByWeek(parseInt(week as string));
+      }
+
+      // 학생 정보와 함께 조회
+      const recordsWithStudents = await Promise.all(
+        records.map(async (record) => {
+          const student = await storage.getStudent(record.studentId);
+          return {
+            ...record,
+            student: student ? {
+              id: student.id,
+              name: student.name,
+              studentNumber: student.studentNumber
+            } : null
+          };
+        })
+      );
+
+      res.json(recordsWithStudents);
+    } catch (error) {
+      res.status(500).json({ message: "일별 학습 기록 종합 조회 실패" });
+    }
+  });
+
   // Evaluation routes
   app.get("/api/evaluations", requireAuth, async (req, res) => {
     try {
