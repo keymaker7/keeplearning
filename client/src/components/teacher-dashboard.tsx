@@ -24,6 +24,13 @@ export default function TeacherDashboard() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [bulkStudents, setBulkStudents] = useState("");
   
+  // Weekly Materials Upload states
+  const [materialTitle, setMaterialTitle] = useState("");
+  const [materialWeek, setMaterialWeek] = useState("");
+  const [materialStartDate, setMaterialStartDate] = useState("");
+  const [materialEndDate, setMaterialEndDate] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
   // Daily Summary states
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
@@ -125,6 +132,67 @@ export default function TeacherDashboard() {
     },
   });
 
+  const uploadMaterialMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await fetch("/api/weekly-materials", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "업로드 실패");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "자료 업로드 완료",
+        description: "주간학습 자료가 성공적으로 업로드되었습니다.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-materials"] });
+      // Reset form
+      setMaterialTitle("");
+      setMaterialWeek("");
+      setMaterialStartDate("");
+      setMaterialEndDate("");
+      setSelectedFile(null);
+      // Reset file input element
+      const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+      if (fileInput) {
+        fileInput.value = '';
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "자료 업로드 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMaterialMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/weekly-materials/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "자료 삭제 완료",
+        description: "주간학습 자료가 삭제되었습니다.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-materials"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "자료 삭제 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteStudentMutation = useMutation({
     mutationFn: async (studentId: string) => {
       const res = await apiRequest("DELETE", `/api/students/${studentId}`);
@@ -198,6 +266,54 @@ export default function TeacherDashboard() {
       studentId: selectedStudent.id,
       newPassword: password,
     });
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "파일 크기 초과",
+          description: "10MB 이하의 파일만 업로드 가능합니다.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSelectedFile(file);
+      toast({
+        title: "파일 선택됨",
+        description: file.name,
+      });
+    }
+  };
+
+  const handleUploadMaterial = () => {
+    if (!materialTitle || !materialWeek || !materialStartDate || !materialEndDate) {
+      toast({
+        title: "입력 오류",
+        description: "모든 필드를 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedFile) {
+      toast({
+        title: "파일 선택 필요",
+        description: "PDF 파일을 선택해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("title", materialTitle);
+    formData.append("week", materialWeek);
+    formData.append("startDate", materialStartDate);
+    formData.append("endDate", materialEndDate);
+    formData.append("file", selectedFile);
+
+    uploadMaterialMutation.mutate(formData);
   };
 
   return (
@@ -814,19 +930,40 @@ export default function TeacherDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>제목</Label>
-                      <Input placeholder="주간학습 자료 제목" data-testid="input-material-title" />
+                      <Input 
+                        placeholder="주간학습 자료 제목" 
+                        value={materialTitle}
+                        onChange={(e) => setMaterialTitle(e.target.value)}
+                        data-testid="input-material-title" 
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>주차</Label>
-                      <Input type="number" placeholder="4" data-testid="input-material-week" />
+                      <Input 
+                        type="number" 
+                        placeholder="4" 
+                        value={materialWeek}
+                        onChange={(e) => setMaterialWeek(e.target.value)}
+                        data-testid="input-material-week" 
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>시작일</Label>
-                      <Input type="date" data-testid="input-start-date" />
+                      <Input 
+                        type="date" 
+                        value={materialStartDate}
+                        onChange={(e) => setMaterialStartDate(e.target.value)}
+                        data-testid="input-start-date" 
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>종료일</Label>
-                      <Input type="date" data-testid="input-end-date" />
+                      <Input 
+                        type="date" 
+                        value={materialEndDate}
+                        onChange={(e) => setMaterialEndDate(e.target.value)}
+                        data-testid="input-end-date" 
+                      />
                     </div>
                   </div>
                   
@@ -836,15 +973,49 @@ export default function TeacherDashboard() {
                       <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                       <p className="text-lg font-medium">PDF 파일을 드래그하거나 클릭하여 업로드</p>
                       <p className="text-sm text-muted-foreground">최대 10MB까지 지원</p>
-                      <Button className="mt-4" data-testid="button-select-file">
+                      {selectedFile && (
+                        <p className="text-sm text-primary mt-2">선택된 파일: {selectedFile.name}</p>
+                      )}
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        id="file-upload"
+                      />
+                      <Button 
+                        className="mt-4" 
+                        onClick={() => document.getElementById('file-upload')?.click()}
+                        data-testid="button-select-file"
+                      >
                         파일 선택
                       </Button>
                     </div>
                   </div>
                   
                   <div className="flex space-x-4">
-                    <Button data-testid="button-upload-material">업로드</Button>
-                    <Button variant="outline">취소</Button>
+                    <Button 
+                      onClick={handleUploadMaterial}
+                      disabled={uploadMaterialMutation.isPending}
+                      data-testid="button-upload-material"
+                    >
+                      {uploadMaterialMutation.isPending && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      업로드
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setMaterialTitle("");
+                        setMaterialWeek("");
+                        setMaterialStartDate("");
+                        setMaterialEndDate("");
+                        setSelectedFile(null);
+                      }}
+                    >
+                      취소
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -876,7 +1047,16 @@ export default function TeacherDashboard() {
                             <Eye className="mr-2 h-4 w-4" />
                             미리보기
                           </Button>
-                          <Button variant="outline" size="sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              if (confirm(`"${material.title}" 자료를 삭제하시겠습니까?`)) {
+                                deleteMaterialMutation.mutate(material.id);
+                              }
+                            }}
+                            disabled={deleteMaterialMutation.isPending}
+                          >
                             <Trash2 className="mr-2 h-4 w-4" />
                             삭제
                           </Button>
