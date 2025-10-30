@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -30,6 +30,13 @@ export default function StudentDashboard() {
   const { data: myRecords = [] } = useQuery<any[]>({
     queryKey: ["/api/learning-records"],
   });
+
+  // 주간학습 자료가 로드되면 첫 번째 주차로 자동 설정
+  useEffect(() => {
+    if (weeklyMaterials.length > 0 && !weeklyMaterials.find((m: any) => String(m.week) === selectedWeek)) {
+      setSelectedWeek(String(weeklyMaterials[0].week));
+    }
+  }, [weeklyMaterials]);
 
   // 요일별/주간별 데이터 조회
   const { data: weeklyRecords = [] } = useQuery({
@@ -293,14 +300,24 @@ export default function StudentDashboard() {
                   </Button>
                 </div>
                 <Select value={selectedWeek} onValueChange={setSelectedWeek}>
-                  <SelectTrigger className="w-48" data-testid="select-week">
+                  <SelectTrigger className="w-64" data-testid="select-week">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">1주차 (9월 1일 - 9월 7일)</SelectItem>
-                    <SelectItem value="2">2주차 (9월 8일 - 9월 14일)</SelectItem>
-                    <SelectItem value="3">3주차 (9월 15일 - 9월 21일)</SelectItem>
-                    <SelectItem value="4">4주차 (9월 22일 - 9월 28일)</SelectItem>
+                    {weeklyMaterials.length > 0 ? (
+                      weeklyMaterials.map((material: any) => (
+                        <SelectItem key={material.id} value={String(material.week)}>
+                          {material.week}주차 ({material.startDate} - {material.endDate})
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <>
+                        <SelectItem value="1">1주차 (9월 1일 - 9월 7일)</SelectItem>
+                        <SelectItem value="2">2주차 (9월 8일 - 9월 14일)</SelectItem>
+                        <SelectItem value="3">3주차 (9월 15일 - 9월 21일)</SelectItem>
+                        <SelectItem value="4">4주차 (9월 22일 - 9월 28일)</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
