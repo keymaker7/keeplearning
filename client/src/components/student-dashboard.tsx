@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, BookOpen, PenTool, Calendar, Save, Send, CalendarDays, Grid3X3 } from "lucide-react";
+import { Loader2, BookOpen, PenTool, Calendar, Save, Send, CalendarDays, Grid3X3, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function StudentDashboard() {
@@ -23,7 +23,7 @@ export default function StudentDashboard() {
   const [dailyRecords, setDailyRecords] = useState<Record<string, Record<number, { subject: string; unit: string; content: string; reflection: string }>>>({});
 
   // Fetch data
-  const { data: weeklyMaterials = [] } = useQuery({
+  const { data: weeklyMaterials = [] } = useQuery<any[]>({
     queryKey: ["/api/weekly-materials"],
   });
 
@@ -231,6 +231,37 @@ export default function StudentDashboard() {
           <h2 className="text-2xl font-bold mb-2">나의 주간 배움 기록</h2>
           <p className="text-muted-foreground">이번 주 학습 내용을 과목별로 정리해보세요</p>
         </div>
+
+        {/* Weekly Materials Info */}
+        {weeklyMaterials.length > 0 && (
+          <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2 text-blue-900 dark:text-blue-100">
+                <FileText className="h-5 w-5" />
+                <span>이번 주 학습 안내</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {weeklyMaterials.map((material: any) => (
+                  <div key={material.id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-blue-100 dark:border-blue-900">
+                    <div className="flex items-center space-x-3">
+                      <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded">
+                        <FileText className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">{material.title}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {material.week}주차 | {material.startDate} ~ {material.endDate}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Week Selection & View Mode */}
         <Card>
