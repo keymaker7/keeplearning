@@ -2,11 +2,12 @@ import { users, students, weeklyMaterials, learningRecords, evaluations } from "
 import type { User, InsertUser, Student, InsertStudent, WeeklyMaterial, InsertWeeklyMaterial, LearningRecord, InsertLearningRecord, Evaluation, InsertEvaluation } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc } from "drizzle-orm";
-import session, { SessionStore } from "express-session";
+import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 
 const PostgresSessionStore = connectPg(session);
+type SessionStore = session.Store;
 
 export interface IStorage {
   // User methods
@@ -90,18 +91,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBulkStudents(studentsData: Array<{ name: string; studentNumber: string; username: string; password: string }>): Promise<User[]> {
-    const results = [];
-    
+    const results: User[] = [];
+
     for (const studentData of studentsData) {
       try {
-        // Create user account
         const user = await this.createUser({
           username: studentData.username,
           password: studentData.password,
+          name: studentData.name,
           role: "student",
+          studentNumber: studentData.studentNumber,
         });
 
-        // Create student profile
         await this.createStudent({
           name: studentData.name,
           studentNumber: studentData.studentNumber,
@@ -112,7 +113,6 @@ export class DatabaseStorage implements IStorage {
         results.push(user);
       } catch (error) {
         console.error(`Failed to create student ${studentData.name}:`, error);
-        // Continue with other students
       }
     }
 
@@ -275,43 +275,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEvaluation(id: string): Promise<void> {
     await db.delete(evaluations).where(eq(evaluations.id, id));
-  }
-
-  // New methods for user password management and bulk operations
-  async updateUserPassword(id: string, password: string): Promise<User | undefined> {
-    const [updatedUser] = await db
-      .update(users)
-      .set({ password })
-      .where(eq(users.id, id))
-      .returning();
-    return updatedUser || undefined;
-  }
-
-  async createBulkStudents(studentsData: Array<{ name: string; studentNumber: string; username: string; password: string }>): Promise<User[]> {
-    const createdUsers: User[] = [];
-    
-    for (const studentData of studentsData) {
-      // Create user account
-      const user = await this.createUser({
-        username: studentData.username,
-        password: studentData.password,
-        name: studentData.name,
-        role: "student",
-        studentNumber: studentData.studentNumber,
-      });
-
-      // Create student profile
-      await this.createStudent({
-        userId: user.id,
-        name: studentData.name,
-        studentNumber: studentData.studentNumber,
-        classRoom: "6학년 7반",
-      });
-
-      createdUsers.push(user);
-    }
-
-    return createdUsers;
   }
 }
 
