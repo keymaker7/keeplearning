@@ -33,6 +33,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerTimetableRoutes(app);
   registerMessageRoutes(app);
 
+  app.get("/api/health", (_req, res) => {
+    res.json({ ok: true });
+  });
+
   // Student management routes
   app.get("/api/students", requireTeacher, async (req, res) => {
     try {

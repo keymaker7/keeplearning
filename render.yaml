@@ -1,0 +1,27 @@
+# Render Blueprint — GitHub 연결 후 원클릭 배포
+# https://render.com/deploy?repo=https://github.com/keymaker7/keeplearning
+databases:
+  - name: keeplearning-db
+    plan: free
+    region: singapore
+
+services:
+  - type: web
+    name: keeplearning
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm run render-build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: keeplearning-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
