@@ -1,6 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
+import { requireAuth, requireTeacher } from "./middleware";
+import { registerTimetableRoutes } from "./routes-timetable";
+import { registerMessageRoutes } from "./routes-messages";
 import { storage } from "./storage";
 import { generateEvaluation, extractSubjectsFromPDF } from "./openai";
 import multer from "multer";
@@ -27,20 +30,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
   setupAuth(app);
 
-  // Authentication middleware
-  const requireAuth = (req: any, res: any, next: any) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "인증이 필요합니다." });
-    }
-    next();
-  };
-
-  const requireTeacher = (req: any, res: any, next: any) => {
-    if (!req.isAuthenticated() || req.user.role !== "teacher") {
-      return res.status(403).json({ message: "교사 권한이 필요합니다." });
-    }
-    next();
-  };
+  registerTimetableRoutes(app);
+  registerMessageRoutes(app);
 
   // Student management routes
   app.get("/api/students", requireTeacher, async (req, res) => {
@@ -54,7 +45,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/students", requireTeacher, async (req, res) => {
     try {
-      const { name, studentNumber, classRoom = "5학년 7반" } = req.body;
+      const { name, studentNumber, classRoom = "6학년 7반" } = req.body;
       
       if (!name || !studentNumber) {
         return res.status(400).json({ message: "이름과 학번은 필수입니다." });

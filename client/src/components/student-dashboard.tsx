@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, BookOpen, PenTool, Calendar, Save, Send, CalendarDays, Grid3X3, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import StudentHeader from "@/components/student-header";
 
 export default function StudentDashboard() {
   const { user, logoutMutation } = useAuth();
@@ -201,36 +202,10 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-50">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-bold text-primary">📚 주간학습 평어 시스템</h1>
-              <div className="hidden md:flex space-x-2">
-                <Badge variant="secondary">학생</Badge>
-                <span className="text-sm text-muted-foreground">{user?.name}님</span>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => logoutMutation.mutate()}
-                disabled={logoutMutation.isPending}
-                data-testid="button-logout"
-              >
-                {logoutMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "로그아웃"
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <StudentHeader
+        onLogout={() => logoutMutation.mutate()}
+        logoutPending={logoutMutation.isPending}
+      />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 space-y-6">

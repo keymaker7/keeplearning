@@ -98,7 +98,7 @@ export function setupAuth(app: Express) {
           userId: user.id,
           name,
           studentNumber,
-          classRoom: "5학년 7반",
+          classRoom: "6학년 7반",
         });
       }
 

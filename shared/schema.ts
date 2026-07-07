@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -11,7 +11,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("student"), // 'teacher' or 'student'
   name: text("name").notNull(),
   studentNumber: text("student_number"),
-  classRoom: text("class_room").default("5학년 7반"),
+  classRoom: text("class_room").default("6학년 7반"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -20,7 +20,7 @@ export const students = pgTable("students", {
   userId: varchar("user_id").references(() => users.id),
   name: text("name").notNull(),
   studentNumber: text("student_number").notNull().unique(),
-  classRoom: text("class_room").notNull().default("5학년 7반"),
+  classRoom: text("class_room").notNull().default("6학년 7반"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -55,6 +55,20 @@ export const learningRecords = pgTable("learning_records", {
   submittedAt: timestamp("submitted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  uniqueIndex("lr_slot_uniq").on(t.studentId, t.week, t.dayOfWeek, t.period),
+]);
+
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fromUserId: varchar("from_user_id").references(() => users.id).notNull(),
+  toStudentId: varchar("to_student_id").references(() => students.id),
+  toUserId: varchar("to_user_id").references(() => users.id),
+  content: text("content").notNull(),
+  relatedSubject: text("related_subject"),
+  isRead: boolean("is_read").default(false),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const evaluations = pgTable("evaluations", {
@@ -75,6 +89,8 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   students: many(students),
   weeklyMaterials: many(weeklyMaterials),
   evaluations: many(evaluations),
+  sentMessages: many(messages, { relationName: "sentMessages" }),
+  receivedMessages: many(messages, { relationName: "receivedMessages" }),
 }));
 
 export const studentsRelations = relations(students, ({ one, many }) => ({
@@ -84,6 +100,25 @@ export const studentsRelations = relations(students, ({ one, many }) => ({
   }),
   learningRecords: many(learningRecords),
   evaluations: many(evaluations),
+  messagesReceived: many(messages, { relationName: "studentMessages" }),
+}));
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  fromUser: one(users, {
+    fields: [messages.fromUserId],
+    references: [users.id],
+    relationName: "sentMessages",
+  }),
+  toStudent: one(students, {
+    fields: [messages.toStudentId],
+    references: [students.id],
+    relationName: "studentMessages",
+  }),
+  toUser: one(users, {
+    fields: [messages.toUserId],
+    references: [users.id],
+    relationName: "receivedMessages",
+  }),
 }));
 
 export const weeklyMaterialsRelations = relations(weeklyMaterials, ({ one, many }) => ({
@@ -147,6 +182,11 @@ export const insertEvaluationSchema = createInsertSchema(evaluations).omit({
   updatedAt: true,
 });
 
+export const insertMessageSchema = createInsertSchema(messages).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -158,3 +198,5 @@ export type LearningRecord = typeof learningRecords.$inferSelect;
 export type InsertLearningRecord = z.infer<typeof insertLearningRecordSchema>;
 export type Evaluation = typeof evaluations.$inferSelect;
 export type InsertEvaluation = z.infer<typeof insertEvaluationSchema>;
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;

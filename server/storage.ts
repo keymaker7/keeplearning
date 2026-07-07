@@ -105,7 +105,7 @@ export class DatabaseStorage implements IStorage {
         await this.createStudent({
           name: studentData.name,
           studentNumber: studentData.studentNumber,
-          classRoom: "5학년 7반",
+          classRoom: "6학년 7반",
           userId: user.id,
         });
 
@@ -305,7 +305,7 @@ export class DatabaseStorage implements IStorage {
         userId: user.id,
         name: studentData.name,
         studentNumber: studentData.studentNumber,
-        classRoom: "5학년 7반",
+        classRoom: "6학년 7반",
       });
 
       createdUsers.push(user);
